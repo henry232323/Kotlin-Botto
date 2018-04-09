@@ -12,7 +12,7 @@ import kotlin.system.exitProcess
 val prefix = "!"
 fun main(args: Array<String>) {
     var config: Map<Any, String>? = null
-    connect("MzE5MjkwOTQzOTI2Njk3OTk0.DaxuSA.m1GBvu1TDkn44c2peH84eq_q5LA")
+    connect("Token goes here")
 }
 
 fun connect(token: String) {
