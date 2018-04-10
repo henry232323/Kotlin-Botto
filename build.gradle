@@ -1,0 +1,40 @@
+buildscript {
+    ext.kotlin_version = '1.2.31'
+
+    repositories {
+        jcenter()
+    }
+    dependencies {
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+    }
+}
+
+plugins {
+    id 'com.github.johnrengelman.shadow' version '1.2.4'
+    id 'application'
+}
+
+apply plugin: 'kotlin'
+
+group 'com.github.henry232323'
+version '0.0.1'
+
+ext.main = 'kotlinbot'
+mainClassName = 'henry232323.kotlinbot'//"$group.${main}Kt"
+
+repositories {
+    jcenter()
+}
+
+dependencies {
+    compile 'net.dv8tion:JDA:3.0.BETA2_120'
+    compile "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
+    compile 'org.reflections:reflections:0.9.10'
+    compile 'org.mariadb.jdbc:mariadb-java-client:1.5.6'
+}
+
+task runBot(type: JavaExec) {
+    main = 'com.github.henry232323.kotlinbot.kotlinbot'
+    classpath = sourceSets.main.runtimeClasspath
+}
+
