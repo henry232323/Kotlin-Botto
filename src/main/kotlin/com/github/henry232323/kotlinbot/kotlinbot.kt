@@ -1,4 +1,5 @@
 @file:JvmName("kotlinbot")
+
 package com.github.henry232323.kotlinbot
 
 import net.dv8tion.jda.core.entities.*
@@ -13,21 +14,20 @@ import javax.security.auth.login.LoginException
 import kotlin.system.exitProcess
 import java.util.*
 import java.util.function.Consumer
+import kotlin.concurrent.thread
 
 
-val prefix = "!"
+val prefix = "pr!"
 
 fun main(args: Array<String>) {
-    var config: Map<Any, String>? = null
-    connect("token")
+    connect("MzE5MjkwOTQzOTI2Njk3OTk0.Da2UbA.vsU9tOdsigbEitXfdPIoyQglaSI")
 }
 
 fun connect(token: String) {
     try {
         JDABuilder(AccountType.BOT)
-                .addListener(MessageListener())
+                .addEventListener(MessageListener())
                 .setBulkDeleteSplittingEnabled(false)
-                .setGame(Game.of("Big Doinks")) // pun xd
                 .setToken(token)
                 .buildBlocking()
     } catch (ex: LoginException) {
@@ -56,9 +56,8 @@ enum class ExitStatus(val code: Int) {
 }
 
 class MessageListener : ListenerAdapter() {
-    init {
-        val commands: Commands = Commands()
-    }
+    val commands: Commands = Commands()
+
     override fun onReady(e: ReadyEvent) {
         val selfUser = e.jda.selfUser
         println("""
@@ -71,22 +70,33 @@ class MessageListener : ListenerAdapter() {
     }
 
     override fun onMessageReceived(e: MessageReceivedEvent) {
-        val content = e.message.rawContent
-        val selfId = e.jda.selfUser.id
-
-        if (content[0].toString() != prefix) {
+        if (e.message.getTextChannel().getId() != "324789027280650260") {
             return
         }
-        val parts: List<String> = content.split("")
-        val cmd = parts[0].substring(1)
+        val content = e.message.getContentRaw()
+        if (content.length > prefix.length) {
+            if (content.substring(0, prefix.length) != prefix) {
+                return
+            } else {
+                thread(block = { processCommand(e, content) })
+            }
+        }
+    }
 
-        if (this.commands.cmds.containsKey(cmd)) {
+    fun processCommand(e: MessageReceivedEvent, content: String) {
+        val parts: List<String> = content.split(" ")
+        if (parts[0] == "") {
+            return
+        }
+        val cmd = parts[0].substring(prefix.length, parts[0].length)
+        if (commands.cmds.containsKey(cmd)) {
             try {
-                this.commands.cmds[cmd](e, parts.subList(1, parts.size))
+                val (func, _) = commands.cmds.get(cmd)!!
+                func(e, parts.subList(1, parts.size))
             } catch (ex: IndexOutOfBoundsException) {
                 reply(e, "You are missing an argument! Look at the help for this command")
             } catch (ex: Exception) {
-                reply(e, ex.message)
+                reply(e, ex.message!!)
             }
         }
     }
@@ -96,53 +106,92 @@ class MessageListener : ListenerAdapter() {
 class Commands() {
     val cmds = mutableMapOf<String, Pair<(MessageReceivedEvent, List<String>) -> Unit, String>>()
     val polls = mutableMapOf<Pair<Guild, String>, Poll>()
+
     init {
-        cmds.put("poll", Pair(::poll<MessageReceivedEvent, List<String>>, "Start a poll, `!poll <poll name> <time in seconds> [*option names]`"))
-        cmds.put("vote", Pair(::vote<MessageReceivedEvent, List<String>>, "Vote for an option in a poll"))
+        cmds.put("poll", Pair(::poll, "Start a poll, `!poll <poll name> <time in seconds> [*option names]`"))
+        cmds.put("vote", Pair(::vote, "Vote for an option in a poll"))
+        cmds.put("polls", Pair(::polls_cmd, "See all available polls"))
     }
 
     fun poll(e: MessageReceivedEvent, args: List<String>) {
         val name = args[0]
         val options = args.subList(2, args.size)
-        this.polls[Pair(e.guild, name)] = Poll(e.guild, name, options)
+        val cpoll = Poll(e.guild, name, options)
+        polls[Pair(e.guild, name)] = cpoll
         val time = args[1].toInt()
         if (time > 3600) {
             reply(e, "Polls cannot last longer than 1 hour!")
             return
         }
-        reply(e, "Started poll #{name}, `!vote #{name} {option}` to vote!")
+        reply(e, "Started poll ${name}, `${prefix}vote ${name} {option}` to vote!")
         Thread.sleep(time.toLong() * 1000)
+        var top = -1
+        var win = 0
+        var ctr = 0
+        var s: Int
+        for ((option, votes) in cpoll.votes.entries) {
+            s = votes.size
+            if (s > top) {
+                top = votes.size
+                win = ctr
+            }
+            ctr += 1
+        }
+        val winner = options[win]
+        reply(e, "Poll ended! $winner won!")
     }
 
     fun vote(e: MessageReceivedEvent, args: List<String>) {
-        val poll = polls[Pair(e, args[0])]
-        poll.votes.get(args.get(1)!!)!!.add(e.message.getAuthor()!!.getID()!!)!!
-        reply(e, "You voted for #{args[1]} in vote #{args[0]}! This option now has #{vote.size} votes!")
+        val poll = polls[Pair<Guild, String>(e.guild, args[0])]
+        if (poll == null) {
+            reply(e, "Poll ${args[0]} doesn't exist!")
+        } else {
+            val votes = poll.votes[args[1]]
+            if (votes == null) {
+                reply(e, "${args[1]} is not a valid option!")
+            } else {
+                val authorId: String = e.message.getAuthor().getId()
+                votes.add(authorId)
+                reply(e, "You voted for ${args[1]} in vote ${args[0]}! This option now has ${votes.size} votes!")
+            }
+        }
+    }
+
+    fun polls_cmd(e: MessageReceivedEvent, _args: List<String>) {
+        var str = "Current Polls: "
+        for ((k, v) in polls.entries) {
+            val (_g, key) = k
+            str += "\n\t${key}:"
+            for ((opt: String, _d: MutableSet<String>) in v.votes.entries) {
+                str += "\n\t\t${opt}"
+            }
+        }
+        reply(e, str)
     }
 
 }
 
 fun reply(e: MessageReceivedEvent, msg: Message, success: Consumer<Message>? = null) {
     if (!e.isFromType(ChannelType.TEXT) || e.textChannel.canTalk()) {
-        e.channel.sendMessage(stripEveryoneHere(msg)).queue(success)
+        e.channel.sendMessage(msg).queue(success)
     }
 }
 
 fun reply(e: MessageReceivedEvent, embed: MessageEmbed, success: Consumer<Message>? = null) {
-    reply(build(embed), success)
+    reply(e, build(embed), success)
 }
 
 fun reply(e: MessageReceivedEvent, text: String, success: Consumer<Message>? = null) {
-    reply(build(text), success)
+    reply(e, build(stripEveryoneHere(text)), success)
 }
 
-fun stripEveryoneHere(text: String): String
-        = text.replace("@here", "@\u180Ehere")
+fun stripEveryoneHere(text: String): String = text.replace("@here", "@\u180Ehere")
         .replace("@everyone", "@\u180Eeveryone")
 
-fun build(o: Any): Message
-        = MessageBuilder().append(o).build()
+fun build(o: Any): Message = MessageBuilder().append(o).build()
 
 class Poll(guild: Guild, name: String, options: List<String>) {
+    val name = name
+    val guild = guild
     val votes = options.map { it to mutableSetOf<String>() }.toMap().toMutableMap()
 }
