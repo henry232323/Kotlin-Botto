@@ -20,7 +20,7 @@ import kotlin.concurrent.thread
 val prefix = "pr!"
 
 fun main(args: Array<String>) {
-    connect("MzE5MjkwOTQzOTI2Njk3OTk0.Da2UbA.vsU9tOdsigbEitXfdPIoyQglaSI")
+    connect("MzE5MjkwOTQzOTI2Njk3OTk0.Da2UbA.vsU9tOdsigbEitXfdPIoyQglaSI") // fuck it, ill just regen the token every time i update i guess
 }
 
 fun connect(token: String) {
