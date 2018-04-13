@@ -7,14 +7,14 @@ import net.dv8tion.jda.core.hooks.ListenerAdapter
 import net.dv8tion.jda.core.events.message.MessageReceivedEvent
 import net.dv8tion.jda.core.events.ReadyEvent
 import net.dv8tion.jda.core.MessageBuilder
-import net.dv8tion.jda.core.Permission
 import net.dv8tion.jda.core.AccountType
 import net.dv8tion.jda.core.JDABuilder
+
 import javax.security.auth.login.LoginException
-import kotlin.system.exitProcess
-import java.util.*
 import java.util.function.Consumer
+
 import kotlin.concurrent.thread
+import kotlin.system.exitProcess
 
 
 val prefix = "pr!"
@@ -91,7 +91,7 @@ class MessageListener : ListenerAdapter() {
         val cmd = parts[0].substring(prefix.length, parts[0].length)
         if (commands.cmds.containsKey(cmd)) {
             try {
-                val (func, _) = commands.cmds.get(cmd)!!
+                val (func, _) = commands.cmds[cmd]!!
                 func(e, parts.subList(1, parts.size))
             } catch (ex: IndexOutOfBoundsException) {
                 reply(e, "You are missing an argument! Look at the help for this command")
@@ -103,14 +103,14 @@ class MessageListener : ListenerAdapter() {
 
 }
 
-class Commands() {
+class Commands {
     val cmds = mutableMapOf<String, Pair<(MessageReceivedEvent, List<String>) -> Unit, String>>()
     val polls = mutableMapOf<Pair<Guild, String>, Poll>()
 
     init {
-        cmds.put("poll", Pair(::poll, "Start a poll, `!poll <poll name> <time in seconds> [*option names]`"))
-        cmds.put("vote", Pair(::vote, "Vote for an option in a poll"))
-        cmds.put("polls", Pair(::polls_cmd, "See all available polls"))
+        cmds["poll"] = Pair(::poll, "Start a poll, `!poll <poll name> <time in seconds> [*option names]`")
+        cmds["vote"] = Pair(::vote, "Vote for an option in a poll")
+        cmds["polls"] = Pair(::pollsCmd, "See all available polls")
     }
 
     fun poll(e: MessageReceivedEvent, args: List<String>) {
@@ -123,13 +123,13 @@ class Commands() {
             reply(e, "Polls cannot last longer than 1 hour!")
             return
         }
-        reply(e, "Started poll ${name}, `${prefix}vote ${name} {option}` to vote!")
+        reply(e, "Started poll $name, `${prefix}vote $name {option}` to vote!")
         Thread.sleep(time.toLong() * 1000)
         var top = -1
         var win = 0
         var ctr = 0
         var s: Int
-        for ((option, votes) in cpoll.votes.entries) {
+        for ((_, votes) in cpoll.votes.entries) {
             s = votes.size
             if (s > top) {
                 top = votes.size
@@ -157,13 +157,14 @@ class Commands() {
         }
     }
 
-    fun polls_cmd(e: MessageReceivedEvent, _args: List<String>) {
+    @Suppress("unused")
+    fun pollsCmd(e: MessageReceivedEvent, _args: List<String>) {
         var str = "Current Polls: "
         for ((k, v) in polls.entries) {
-            val (_g, key) = k
-            str += "\n\t${key}:"
-            for ((opt: String, _d: MutableSet<String>) in v.votes.entries) {
-                str += "\n\t\t${opt}"
+            val (_, key) = k
+            str += "\n\t$key:"
+            for ((opt: String, _: MutableSet<String>) in v.votes.entries) {
+                str += "\n\t\t$opt"
             }
         }
         reply(e, str)
@@ -191,7 +192,5 @@ fun stripEveryoneHere(text: String): String = text.replace("@here", "@\u180Ehere
 fun build(o: Any): Message = MessageBuilder().append(o).build()
 
 class Poll(guild: Guild, name: String, options: List<String>) {
-    val name = name
-    val guild = guild
     val votes = options.map { it to mutableSetOf<String>() }.toMap().toMutableMap()
 }
